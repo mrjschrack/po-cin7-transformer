@@ -1,0 +1,2048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PO → Cin7 Transformer v5.5</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Work+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #2D5BFF;
+            --primary-dark: #1a3dd9;
+            --success: #00C48C;
+            --warning: #FFB020;
+            --error: #FF4757;
+            --bg: #0A0E27;
+            --bg-light: #151935;
+            --bg-lighter: #1f2442;
+            --text: #E8EAED;
+            --text-dim: #9BA4B5;
+            --border: #2a2f4a;
+        }
+        
+        body {
+            font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 20% 50%, rgba(45, 91, 255, 0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(0, 196, 140, 0.1) 0%, transparent 50%);
+            animation: drift 20s ease-in-out infinite;
+            z-index: 0;
+        }
+        
+        @keyframes drift {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(-30px, -30px); }
+        }
+        
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 30px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 0.6s ease-out;
+        }
+        
+        .header-actions {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        h1 {
+            font-family: 'Space Mono', monospace;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--success) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-dim);
+            font-weight: 300;
+        }
+        
+        .card {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+            animation: fadeInUp 0.6s ease-out;
+            animation-fill-mode: both;
+        }
+        
+        .card:nth-child(2) { animation-delay: 0.1s; }
+        .card:nth-child(3) { animation-delay: 0.2s; }
+        
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--bg-lighter);
+        }
+        
+        .drop-zone:hover {
+            border-color: var(--primary);
+            background: rgba(45, 91, 255, 0.05);
+        }
+        
+        .drop-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(45, 91, 255, 0.1);
+            transform: scale(1.02);
+        }
+        
+        .drop-zone.has-file {
+            border-color: var(--success);
+            background: rgba(0, 196, 140, 0.05);
+        }
+        
+        .drop-zone-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+        
+        .drop-zone-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+        
+        .drop-zone-subtext {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .file-info {
+            display: none;
+            margin-top: 16px;
+            padding: 12px;
+            background: var(--bg-lighter);
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .file-info.visible {
+            display: block;
+        }
+        
+        .file-name {
+            font-family: 'Space Mono', monospace;
+            color: var(--success);
+            font-size: 0.9rem;
+        }
+        
+        .format-status {
+            display: none;
+            margin-bottom: 30px;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid var(--success);
+            background: var(--bg-lighter);
+        }
+        
+        .format-status.visible {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            animation: fadeInUp 0.5s ease-out;
+        }
+        
+        .format-status.unrecognized {
+            border-left-color: var(--warning);
+        }
+        
+        .format-status-icon {
+            font-size: 2rem;
+        }
+        
+        .format-status-text {
+            flex: 1;
+        }
+        
+        .format-status-title {
+            font-family: 'Space Mono', monospace;
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+        
+        .format-status-desc {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+        
+        .transform-btn {
+            display: none;
+            width: 100%;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            font-family: 'Space Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(45, 91, 255, 0.4);
+            margin-bottom: 30px;
+        }
+        
+        .transform-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(45, 91, 255, 0.5);
+        }
+        
+        .transform-btn:disabled {
+            background: var(--text-dim);
+            cursor: not-allowed;
+        }
+        
+        .transform-btn.processing {
+            background: var(--text-dim);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .mapping-ui {
+            display: none;
+            margin-top: 30px;
+            padding: 30px;
+            background: var(--bg-lighter);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+        
+        .mapping-ui.visible {
+            display: block;
+            animation: fadeInUp 0.5s ease-out;
+        }
+        
+        .mapping-header {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text);
+        }
+        
+        .mapping-rows {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding-right: 10px;
+        }
+        
+        .mapping-rows::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .mapping-rows::-webkit-scrollbar-track {
+            background: var(--bg);
+            border-radius: 4px;
+        }
+        
+        .mapping-rows::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        
+        .mapping-rows::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+        
+        .mapping-row {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 16px;
+            background: var(--bg);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        
+        .column-label {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--text);
+            font-weight: 600;
+        }
+        
+        .mapping-arrow {
+            color: var(--primary);
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .mapping-select {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.9rem;
+            font-family: 'Work Sans', sans-serif;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .mapping-select:hover {
+            border-color: var(--primary);
+        }
+        
+        .mapping-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(45, 91, 255, 0.1);
+        }
+        
+        .mapping-select option {
+            background: var(--bg-light);
+            color: var(--text);
+        }
+        
+        .mapping-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        .save-format-btn {
+            flex: 1;
+            padding: 14px 24px;
+            background: var(--success);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-family: 'Space Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .save-format-btn:hover {
+            background: #00a074;
+            transform: translateY(-2px);
+        }
+        
+        .transform-mapped-btn {
+            flex: 2;
+            padding: 14px 24px;
+            background: linear-gradient(135deg, var(--primary) 0%, #1a3dd9 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-family: 'Space Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(45, 91, 255, 0.3);
+        }
+        
+        .transform-mapped-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(45, 91, 255, 0.4);
+        }
+        
+        .results {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .results.visible {
+            display: block;
+            animation: fadeInUp 0.5s ease-out;
+        }
+        
+        .result-card {
+            background: var(--bg-lighter);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
+            border-left: 4px solid var(--success);
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .result-title {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--success);
+        }
+        
+        .result-badge {
+            background: rgba(0, 196, 140, 0.2);
+            color: var(--success);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .match-info {
+            background: var(--bg);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .match-info-icon {
+            font-size: 1.5rem;
+        }
+        
+        .result-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .detail-item {
+            background: var(--bg);
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .detail-label {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .detail-value {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+        
+        .download-btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--success);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Space Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .download-btn:hover {
+            background: #00a574;
+            transform: translateY(-2px);
+        }
+        
+        .error-message {
+            display: none;
+            background: rgba(255, 71, 87, 0.1);
+            border: 1px solid var(--error);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 20px;
+            color: var(--error);
+        }
+        
+        .error-message.visible {
+            display: block;
+            animation: shake 0.5s ease-out;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Work Sans', sans-serif;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(45, 91, 255, 0.4);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--bg-light);
+            border-color: var(--primary);
+        }
+        
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, var(--error) 0%, #d63447 100%);
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 14, 39, 0.95);
+            z-index: 1000;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        .modal.visible {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .modal-content {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 40px;
+            position: relative;
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        .modal-header {
+            margin-bottom: 30px;
+        }
+        
+        .modal-title {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .modal-subtitle {
+            color: var(--text-dim);
+            font-size: 0.95rem;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .modal-close:hover {
+            background: var(--bg-lighter);
+            color: var(--text);
+        }
+        
+        .format-list {
+            margin-bottom: 20px;
+        }
+        
+        .format-item {
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .format-item:hover {
+            border-color: var(--primary);
+        }
+        
+        .format-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        
+        .format-item-info {
+            flex: 1;
+        }
+        
+        .format-item-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+        
+        .format-item-details {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 4px;
+        }
+        
+        .format-item-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .format-item-mapping {
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.8rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .mapping-preview {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 8px;
+            margin-bottom: 4px;
+            align-items: center;
+        }
+        
+        .mapping-preview-arrow {
+            color: var(--primary);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-dim);
+        }
+        
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-lighter);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: 'Work Sans', sans-serif;
+            font-size: 1rem;
+            transition: border-color 0.2s ease;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .form-textarea {
+            min-height: 120px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 1px solid var(--border);
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PO → Cin7 Transformer</h1>
+            <p class="subtitle">Convert retail purchase orders to Cin7-ready imports with smart company matching</p>
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 6px; font-family: 'Space Mono', monospace;">v5.5</div>
+            <div class="header-actions">
+                <button class="btn btn-secondary btn-small" onclick="openFormatManager()">Manage Formats</button>
+            </div>
+        </header>
+        
+        <div class="card">
+            <div class="drop-zone" id="poDropZone">
+                <div class="drop-zone-icon">📦</div>
+                <div class="drop-zone-text">Drop PO CSV File Here</div>
+                <div class="drop-zone-subtext">or click to browse</div>
+            </div>
+            <input type="file" id="poFileInput" class="file-input" accept=".csv">
+            <div class="file-info" id="poFileInfo">
+                <div class="file-name" id="poFileName"></div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="drop-zone" id="contactsDropZone">
+                <div class="drop-zone-icon">📇</div>
+                <div class="drop-zone-text">Drop Contact Export CSV (Optional)</div>
+                <div class="drop-zone-subtext">For automatic company name matching</div>
+            </div>
+            <input type="file" id="contactsFileInput" class="file-input" accept=".csv">
+            <div class="file-info" id="contactsFileInfo">
+                <div class="file-name" id="contactsFileName"></div>
+            </div>
+        </div>
+        
+        <div class="format-status" id="formatStatus">
+            <div class="format-status-icon" id="formatStatusIcon"></div>
+            <div class="format-status-text">
+                <div class="format-status-title" id="formatStatusTitle"></div>
+                <div class="format-status-desc" id="formatStatusDesc"></div>
+            </div>
+        </div>
+        <div id="saveAsNewWrapper" style="display:none; margin-top: 10px;">
+            <button id="saveAsNewBtn" class="save-format-btn" style="width:100%; font-size:0.85rem; padding: 10px 16px;">💾 Save as New Format…</button>
+        </div>
+        
+        <div class="mapping-ui" id="mappingUI">
+            <div class="mapping-header">📋 Column Mapping</div>
+            <div class="mapping-rows" id="mappingRows"></div>
+            <div class="mapping-buttons">
+                <button class="save-format-btn" id="saveFormatBtn">💾 Save This Format</button>
+                <button class="transform-mapped-btn" id="transformMappedBtn">✨ Transform to Cin7</button>
+            </div>
+        </div>
+        
+        <button class="transform-btn" id="transformBtn" disabled>Transform to Cin7 Format</button>
+        
+        <div class="error-message" id="errorMessage"></div>
+        
+        <div class="results" id="results">
+            <div class="result-card">
+                <div class="result-header">
+                    <div class="result-title" id="resultTitle"></div>
+                    <div class="result-badge">✓ Success</div>
+                </div>
+                
+                <div class="match-info" id="matchInfo">
+                    <span class="match-info-icon">🎯</span>
+                    <span id="matchText"></span>
+                </div>
+                
+                <div class="result-details">
+                    <div class="detail-item">
+                        <div class="detail-label">Purchase Orders</div>
+                        <div class="detail-value" id="poNumber"></div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Total Line Items</div>
+                        <div class="detail-value" id="lineCount"></div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Companies</div>
+                        <div class="detail-value" id="companyName"></div>
+                    </div>
+                </div>
+                
+                <button class="download-btn" id="downloadBtn">⬇ Download Cin7 Import File</button>
+            </div>
+        </div>
+        
+        <footer>
+            Built for warehouse operations • Decibullz Sales Department
+        </footer>
+    </div>
+    
+    <!-- Format Manager Modal -->
+    <div class="modal" id="formatManagerModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeFormatManager()">×</button>
+            <div class="modal-header">
+                <div class="modal-title">Format Manager</div>
+                <div class="modal-subtitle">View and manage saved PO formats</div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div style="display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px;">
+                <button id="tabFormats" onclick="switchManagerTab('formats')" style="padding: 10px 20px; background: none; border: none; border-bottom: 2px solid var(--accent); color: var(--accent); font-family: 'Space Mono', monospace; font-size: 0.85rem; cursor: pointer;">PO Formats</button>
+                <button id="tabAliases" onclick="switchManagerTab('aliases')" style="padding: 10px 20px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); font-family: 'Space Mono', monospace; font-size: 0.85rem; cursor: pointer;">Company Aliases</button>
+            </div>
+
+            <!-- Formats Tab -->
+            <div id="formatsTabContent">
+            <div id="formatListView">
+                <div class="format-list" id="formatList">
+                    <!-- Format items will be populated here -->
+                </div>
+            </div>
+            
+            <div id="formatEditorView" style="display: none;">
+                <button class="btn btn-secondary btn-small" onclick="showFormatList()" style="margin-bottom: 20px;">← Back to Formats</button>
+                
+                <div class="form-group">
+                    <label class="form-label">Format Name</label>
+                    <input type="text" class="form-input" id="editFormatName" placeholder="e.g., Scheels Standard, Zoro/SPS">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Column Mappings</label>
+                    <div style="background: var(--bg-lighter); border: 1px solid var(--border); border-radius: 12px; padding: 20px; max-height: 400px; overflow-y: auto;">
+                        <div id="editMappingRows"></div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Delivery Instructions Template (Optional)</label>
+                    <textarea class="form-input form-textarea" id="editDeliveryTemplate" placeholder="Use placeholders like <Ship Date>, <SPS Order #>, <Customer Order #>, <Cin7 Order #>"></textarea>
+                    <div style="font-size: 0.85rem; color: var(--text-dim); margin-top: 8px;">
+                        Available placeholders: Any column name from your PO in angle brackets (e.g., &lt;Ship Date&gt;, &lt;SPS Order #&gt;)
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Internal Comments Template (Optional)</label>
+                    <textarea class="form-input form-textarea" id="editInternalCommentsTemplate" placeholder="Use placeholders like <Ship Date>, <SPS Order #>, <Customer Order #>, <Cin7 Order #>"></textarea>
+                    <div style="font-size: 0.85rem; color: var(--text-dim); margin-top: 8px;">
+                        Available placeholders: Any column name from your PO in angle brackets (e.g., &lt;Ship Date&gt;, &lt;SPS Order #&gt;)
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Content Identifier (Optional)</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" class="form-input" id="editIdentifierColumn" placeholder="Column name (e.g., Partner)" style="flex: 1;">
+                        <input type="text" class="form-input" id="editIdentifierValue" placeholder="Expected value (e.g., Scheels All Sports)" style="flex: 2;">
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-dim); margin-top: 8px;">
+                        Used to distinguish formats that share the same column structure. When multiple saved formats match a file's columns, the tool checks this field to pick the right one.
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 12px; margin-top: 30px;">
+                    <button class="btn" onclick="updateFormat()">Save Changes</button>
+                    <button class="btn btn-secondary" onclick="showFormatList()">Cancel</button>
+                    <button class="btn btn-danger" onclick="deleteCurrentFormat()" style="margin-left: auto;">Delete Format</button>
+                </div>
+            </div>
+            </div> <!-- end formatsTabContent -->
+
+            <!-- Aliases Tab -->
+            <div id="aliasesTabContent" style="display: none;">
+                <div style="margin-bottom: 16px; font-size: 0.85rem; color: var(--text-dim); line-height: 1.5;">
+                    When a PO company name matches the <strong style="color: var(--text);">PO Name</strong> column, the tool will search your contacts using the <strong style="color: var(--text);">Search As</strong> name instead — then use the ship-to address to pick the correct location.
+                </div>
+
+                <!-- Alias list -->
+                <div id="aliasList" style="margin-bottom: 20px;"></div>
+
+                <!-- Add new alias -->
+                <div style="background: var(--bg-lighter); border: 1px solid var(--border); border-radius: 12px; padding: 16px;">
+                    <div style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Add Alias</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                        <div>
+                            <label class="form-label" style="font-size: 0.8rem;">PO Name (as it appears in PO)</label>
+                            <input type="text" class="form-input" id="newAliasFrom" placeholder="e.g. ACADEMY LTD" style="margin: 0;">
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size: 0.8rem;">Search As (in your contacts)</label>
+                            <input type="text" class="form-input" id="newAliasTo" placeholder="e.g. ACADEMY SPORTS" style="margin: 0;">
+                        </div>
+                        <button class="btn" onclick="addAlias()" style="white-space: nowrap;">+ Add</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    
+    <script>
+        let poFileData = null;
+        let contactsData = null;
+        let transformedData = null;
+        let currentMapping = null;
+        let currentColumns = [];
+        let currentEditingFormatId = null;
+        
+        // Format library - stored in localStorage
+        let formatLibrary = JSON.parse(localStorage.getItem('formatLibrary') || '[]');
+
+        // Company alias library - stored in localStorage
+        let aliasLibrary = JSON.parse(localStorage.getItem('aliasLibrary') || '[]');
+        
+        // Migrate old formats to new structure
+        formatLibrary = formatLibrary.map((format, index) => {
+            if (!format.id) {
+                format.id = 'fmt_' + Date.now() + '_' + index;
+            }
+            if (!format.name) {
+                format.name = 'Format ' + (index + 1);
+            }
+            // v4.5: Migrate old mapping direction {csvCol: cin7Field} to new {cin7Field: csvCol}
+            if (!format.mappingVersion || format.mappingVersion < 2) {
+                const invertedMapping = {};
+                for (const [csvCol, cin7Field] of Object.entries(format.mapping || {})) {
+                    if (cin7Field) invertedMapping[cin7Field] = csvCol;
+                }
+                format.mapping = invertedMapping;
+                format.mappingVersion = 2;
+            }
+            return format;
+        });
+        localStorage.setItem('formatLibrary', JSON.stringify(formatLibrary));
+        
+        // Cin7 target columns
+        const cin7Columns = {
+            'Company': 'Company',
+            'Company ID': 'Company ID',
+            'Order Ref': 'Order Ref',
+            'Created Date': 'Created Date',
+            'Delivery First Name': 'Delivery First Name',
+            'Delivery Last Name': 'Delivery Last Name',
+            'Phone': 'Phone',
+            'Email': 'Email',
+            'Requested Ship Date': 'Requested Ship Date',
+            'Customer PO#': 'Customer PO#',
+            'Delivery Company': 'Delivery Company',
+            'Delivery Address 1': 'Delivery Address 1',
+            'Delivery Address 2': 'Delivery Address 2',
+            'Delivery City': 'Delivery City',
+            'Delivery State': 'Delivery State',
+            'Delivery Postal Code': 'Delivery Postal Code',
+            'Delivery Country': 'Delivery Country',
+            'Delivery Instructions': 'Delivery Instructions',
+            'Internal Comments': 'Internal Comments',
+            'Item Code': 'Item Code',
+            'Item Qty': 'Item Qty',
+            'Item Price': 'Item Price',
+            'Stage': 'Stage',
+            'Created By': 'Created By'
+        };
+        
+        // Setup drop zones
+        setupDropZone('poDropZone', 'poFileInput', async (file) => {
+            try {
+                poFileData = await parseCSV(file);
+                document.getElementById('poFileName').textContent = file.name;
+                document.getElementById('poFileInfo').classList.add('visible');
+                document.getElementById('poDropZone').classList.add('has-file');
+                analyzeFormat();
+            } catch (error) {
+                showError('Error reading PO file: ' + error.message);
+            }
+        });
+        
+        setupDropZone('contactsDropZone', 'contactsFileInput', async (file) => {
+            try {
+                contactsData = await parseCSV(file);
+                document.getElementById('contactsFileName').textContent = file.name;
+                document.getElementById('contactsFileInfo').classList.add('visible');
+                document.getElementById('contactsDropZone').classList.add('has-file');
+            } catch (error) {
+                showError('Error reading contacts file: ' + error.message);
+            }
+        });
+        
+        function setupDropZone(zoneId, inputId, onFileSelect) {
+            const dropZone = document.getElementById(zoneId);
+            const fileInput = document.getElementById(inputId);
+            
+            dropZone.addEventListener('click', () => fileInput.click());
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file && file.name.endsWith('.csv')) {
+                    onFileSelect(file);
+                }
+            });
+            
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    onFileSelect(file);
+                }
+            });
+        }
+        
+        function parseCSV(file) {
+            return new Promise((resolve, reject) => {
+                Papa.parse(file, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => resolve(results.data),
+                    error: (error) => reject(error)
+                });
+            });
+        }
+        
+        // Format recognition functions
+        function createFingerprint(columns) {
+            const sortedColumns = [...columns].sort().join('|');
+            return sortedColumns.toLowerCase();
+        }
+        
+        function analyzeFormat() {
+            if (!poFileData || poFileData.length === 0) return;
+            
+            currentColumns = Object.keys(poFileData[0]);
+            const fingerprint = createFingerprint(currentColumns);
+            
+            // Check if format is recognized
+            const fingerprintMatches = formatLibrary.filter(f => f.fingerprint === fingerprint);
+            let matchedFormat = null;
+            if (fingerprintMatches.length === 1) {
+                matchedFormat = fingerprintMatches[0];
+            } else if (fingerprintMatches.length > 1) {
+                // Multiple formats share this structure — use content identifier as tiebreaker
+                const firstDataRow = poFileData[0] || {};
+                matchedFormat = fingerprintMatches.find(f => {
+                    if (!f.contentIdentifier || !f.contentIdentifier.column) return false;
+                    const cellValue = (firstDataRow[f.contentIdentifier.column] || '').trim().toLowerCase();
+                    const expected = (f.contentIdentifier.value || '').trim().toLowerCase();
+                    return expected && cellValue === expected;
+                });
+                // Fall back to first match if tiebreaker finds nothing
+                if (!matchedFormat) matchedFormat = fingerprintMatches[0];
+            }
+            
+            document.getElementById('results').classList.remove('visible');
+            document.getElementById('errorMessage').classList.remove('visible');
+            
+            if (matchedFormat) {
+                // Recognized format
+                currentMapping = matchedFormat.mapping;
+                showFormatStatus(true, matchedFormat.name);
+                document.getElementById('mappingUI').classList.remove('visible');
+                document.getElementById('transformBtn').classList.remove('visible');
+                document.getElementById('transformBtn').style.display = 'block';
+                document.getElementById('transformBtn').disabled = false;
+            } else {
+                // Unrecognized format - show mapping UI
+                currentMapping = null;
+                showFormatStatus(false);
+                buildMappingUI();
+                document.getElementById('transformBtn').style.display = 'none';
+            }
+        }
+        
+        function showFormatStatus(recognized, formatName = '') {
+            const statusEl = document.getElementById('formatStatus');
+            const iconEl = document.getElementById('formatStatusIcon');
+            const titleEl = document.getElementById('formatStatusTitle');
+            const descEl = document.getElementById('formatStatusDesc');
+            
+            statusEl.classList.add('visible');
+            
+            if (recognized) {
+                statusEl.classList.remove('unrecognized');
+                iconEl.textContent = '✅';
+                titleEl.textContent = 'Recognized Format';
+                descEl.textContent = formatName ? `Using saved format: ${formatName}` : 'This PO format matches a saved pattern. Ready to transform!';
+                document.getElementById('saveAsNewWrapper').style.display = 'block';
+            } else {
+                statusEl.classList.add('unrecognized');
+                iconEl.textContent = '⚠️';
+                titleEl.textContent = 'Unrecognized Format';
+                descEl.textContent = 'Map the columns below and save this format for future use.';
+                document.getElementById('saveAsNewWrapper').style.display = 'none';
+            }
+        }
+        
+        function buildMappingUI() {
+            const mappingRowsEl = document.getElementById('mappingRows');
+            mappingRowsEl.innerHTML = '';
+            
+            const defaultMapping = buildDefaultMapping();
+            
+            Object.keys(cin7Columns).forEach(cin7Field => {
+                const bestMatch = defaultMapping[cin7Field] || findBestMatch(cin7Field);
+                mappingRowsEl.appendChild(buildMappingRow(cin7Field, currentColumns, bestMatch));
+            });
+            
+            document.getElementById('mappingUI').classList.add('visible');
+        }
+        
+        // Build a mapping row with dropdown + optional manual text input
+        function buildMappingRow(cin7Field, columns, savedValue) {
+            const isStatic = savedValue && savedValue.startsWith('__STATIC__:');
+            const staticText = isStatic ? savedValue.slice('__STATIC__:'.length) : '';
+            const selectedCol = isStatic ? '' : (savedValue || '');
+
+            const row = document.createElement('div');
+            row.className = 'mapping-row';
+            row.style.flexWrap = 'wrap';
+            row.innerHTML = `
+                <div class="column-label">${cin7Field}</div>
+                <div class="mapping-arrow">→</div>
+                <select class="mapping-select" data-cin7="${cin7Field}" onchange="onMappingSelectChange(this)">
+                    <option value="">Skip / Not in file</option>
+                    ${columns.map(col =>
+                        `<option value="${col}" ${col === selectedCol ? 'selected' : ''}>${col}</option>`
+                    ).join('')}
+                    <option value="__MANUAL__" ${isStatic ? 'selected' : ''}>✏ Manual entry...</option>
+                </select>
+                <input type="text" class="form-input mapping-manual-input" data-cin7="${cin7Field}"
+                    placeholder="Type static value..."
+                    value="${staticText.replace(/"/g, '&quot;')}"
+                    style="margin: 4px 0 0 0; width: 100%; display: ${isStatic ? 'block' : 'none'};">
+            `;
+            return row;
+        }
+
+        function onMappingSelectChange(select) {
+            const row = select.closest('.mapping-row');
+            const manualInput = row.querySelector('.mapping-manual-input');
+            if (select.value === '__MANUAL__') {
+                manualInput.style.display = 'block';
+                manualInput.focus();
+            } else {
+                manualInput.style.display = 'none';
+                manualInput.value = '';
+            }
+        }
+
+        // Read mapping value from a row (handles static prefix)
+        function readMappingValue(row) {
+            const select = row.querySelector('select');
+            if (select.value === '__MANUAL__') {
+                const text = row.querySelector('.mapping-manual-input').value.trim();
+                return text ? '__STATIC__:' + text : '';
+            }
+            return select.value;
+        }
+
+        function buildDefaultMapping() {
+            // Maps cin7 output field -> likely CSV source column name (for SPS/Scheels common formats)
+            return {
+                'Order Ref': 'PO Number',
+                'Customer PO#': 'Retailers PO',
+                'Created Date': 'PO Date',
+                'Requested Ship Date': 'Ship Dates',
+                'Delivery Company': 'Ship To Name',
+                'Delivery Address 1': 'Ship To Address 1',
+                'Delivery Address 2': 'Ship To Address 2',
+                'Delivery City': 'Ship To City',
+                'Delivery State': 'Ship To State',
+                'Delivery Postal Code': 'Ship to Zip',
+                'Delivery Country': 'Ship To Country',
+                'Item Code': 'Buyers Catalog or Stock Keeping #',
+                'Item Qty': 'Qty Ordered',
+                'Item Price': 'Unit Price'
+            };
+        }
+        
+        function findBestMatch(cin7Field) {
+            // Given a Cin7 output field name, find the best matching column from the uploaded CSV
+            const fieldKeywords = {
+                'Order Ref':            ['po number', 'po#', 'order number', 'order ref', 'purchase order'],
+                'Customer PO#':         ['retailers po', 'customer po', 'retail po', 'po#'],
+                'Created Date':         ['po date', 'order date', 'created date', 'creation date'],
+                'Requested Ship Date':  ['ship date', 'ship dates', 'requested ship', 'must ship'],
+                'Delivery Company':     ['ship to name', 'ship to company', 'company name', 'store name'],
+                'Delivery Address 1':   ['address 1', 'address one', 'ship to address 1', 'street'],
+                'Delivery Address 2':   ['address 2', 'address two', 'ship to address 2'],
+                'Delivery City':        ['city', 'ship to city', 'ship city'],
+                'Delivery State':       ['state', 'ship to state', 'ship state'],
+                'Delivery Postal Code': ['zip', 'postal', 'ship to zip', 'ship zip'],
+                'Delivery Country':     ['country', 'ship to country'],
+                'Item Code':            ['sku', 'item code', 'catalog', 'stock keeping', 'buyers catalog', 'item #'],
+                'Item Qty':             ['qty', 'quantity', 'qty ordered', 'units'],
+                'Item Price':           ['price', 'unit price', 'cost', 'each'],
+                'Company':              ['company', 'customer', 'account'],
+                'Email':                ['email'],
+                'Phone':                ['phone', 'telephone'],
+                'Delivery First Name':  ['first name', 'fname', 'contact first'],
+                'Delivery Last Name':   ['last name', 'lname', 'contact last'],
+            };
+            
+            const keywords = fieldKeywords[cin7Field] || [cin7Field.toLowerCase()];
+            
+            for (const col of currentColumns) {
+                const colLower = col.toLowerCase();
+                for (const kw of keywords) {
+                    if (colLower.includes(kw)) return col;
+                }
+            }
+            return '';
+        }
+        
+        // Save format button handler
+        document.getElementById('saveFormatBtn').addEventListener('click', () => {
+            const formatName = prompt('Enter a name for this format (e.g., "Scheels Standard", "Zoro/SPS"):');
+            if (!formatName) return;
+            
+            const deliveryTemplate = prompt('Enter delivery instructions template (optional):\nUse placeholders like <Ship Date>, <Order #>\nLeave blank to skip:') || '';
+
+            // Check if any existing formats share this fingerprint — if so, prompt for content identifier
+            const fingerprint = createFingerprint(currentColumns);
+            const conflicts = formatLibrary.filter(f => f.fingerprint === fingerprint);
+            let contentIdentifier = { column: '', value: '' };
+            if (conflicts.length > 0) {
+                const idCol = prompt(`This format has the same column structure as "${conflicts.map(f=>f.name).join('", "')}". To tell them apart, enter the column name that identifies this vendor (e.g., "Partner"):\n\nAvailable columns: ${currentColumns.join(', ')}\n\nLeave blank to skip:`);
+                if (idCol && idCol.trim()) {
+                    const sampleValue = (poFileData[0] || {})[idCol.trim()] || '';
+                    const idVal = prompt(`Content identifier column: "${idCol.trim()}"\nCurrent file value: "${sampleValue}"\n\nEnter the expected value for this vendor (or press OK to use the current value):`);
+                    contentIdentifier = {
+                        column: idCol.trim(),
+                        value: (idVal !== null ? idVal : sampleValue).trim()
+                    };
+                }
+            }
+            
+            const mapping = {};
+            document.querySelectorAll('#mappingRows .mapping-row').forEach(row => {
+                const cin7Field = row.querySelector('select').dataset.cin7;
+                const val = readMappingValue(row);
+                if (val) mapping[cin7Field] = val;
+            });
+            
+            const newFormat = {
+                id: 'fmt_' + Date.now(),
+                name: formatName,
+                fingerprint,
+                columns: currentColumns,
+                mapping,
+                mappingVersion: 2,
+                deliveryTemplate,
+                internalCommentsTemplate: '',
+                contentIdentifier,
+                created: new Date().toISOString()
+            };
+            
+            formatLibrary.push(newFormat);
+            localStorage.setItem('formatLibrary', JSON.stringify(formatLibrary));
+            currentMapping = mapping;
+            
+            showFormatStatus(true, formatName);
+            
+            const saveBtn = document.getElementById('saveFormatBtn');
+            const originalText = saveBtn.textContent;
+            saveBtn.textContent = '✅ Format Saved!';
+            setTimeout(() => {
+                saveBtn.textContent = originalText;
+            }, 2000);
+        });
+        
+        // Save as New Format button handler (shown when a recognized format is loaded)
+        document.getElementById('saveAsNewBtn').addEventListener('click', () => {
+            if (!poFileData || !currentColumns.length) return;
+
+            const formatName = prompt('Enter a name for this new format (e.g., "Scheels - SPS"):');
+            if (!formatName) return;
+
+            const deliveryTemplate = prompt('Delivery instructions template (optional):\nLeave blank to skip:') || '';
+
+            // Always prompt for content identifier since formats sharing a fingerprint is the whole reason this button exists
+            const idCol = prompt('Enter the column name that identifies this vendor (e.g., "Partner"):\n\nAvailable columns: ' + currentColumns.join(', ') + '\n\nLeave blank to skip:');
+            let contentIdentifier = { column: '', value: '' };
+            if (idCol && idCol.trim()) {
+                const sampleValue = (poFileData[0] || {})[idCol.trim()] || '';
+                const idVal = prompt('Content identifier column: "' + idCol.trim() + '"\nCurrent file value: "' + sampleValue + '"\n\nEnter the expected value (or OK to use current):');
+                contentIdentifier = {
+                    column: idCol.trim(),
+                    value: (idVal !== null ? idVal : sampleValue).trim()
+                };
+            }
+
+            const fingerprint = createFingerprint(currentColumns);
+            const newFormat = {
+                id: 'fmt_' + Date.now(),
+                name: formatName,
+                fingerprint,
+                columns: currentColumns,
+                mapping: currentMapping,
+                mappingVersion: 2,
+                deliveryTemplate,
+                internalCommentsTemplate: '',
+                contentIdentifier,
+                created: new Date().toISOString()
+            };
+
+            formatLibrary.push(newFormat);
+            localStorage.setItem('formatLibrary', JSON.stringify(formatLibrary));
+
+            const btn = document.getElementById('saveAsNewBtn');
+            const orig = btn.textContent;
+            btn.textContent = '✅ Saved as "' + formatName + '"!';
+            setTimeout(() => { btn.textContent = orig; }, 2500);
+        });
+
+        // Transform with mapping button handler
+        document.getElementById('transformMappedBtn').addEventListener('click', () => {
+            if (!poFileData) return;
+            
+            const mapping = {};
+            document.querySelectorAll('#mappingRows .mapping-row').forEach(row => {
+                const cin7Field = row.querySelector('select').dataset.cin7;
+                const val = readMappingValue(row);
+                if (val) mapping[cin7Field] = val;
+            });
+            currentMapping = mapping;
+            
+            const btn = document.getElementById('transformMappedBtn');
+            btn.disabled = true;
+            btn.textContent = 'Transforming...';
+            
+            document.getElementById('results').classList.remove('visible');
+            document.getElementById('errorMessage').classList.remove('visible');
+            
+            try {
+                const result = transformPO(poFileData, contactsData);
+                transformedData = result;
+                displayResults(result);
+                btn.textContent = '✨ Transform to Cin7';
+                btn.disabled = false;
+            } catch (error) {
+                showError(error.message);
+                btn.textContent = '✨ Transform to Cin7';
+                btn.disabled = false;
+            }
+        });
+        
+        // Regular transform button handler
+        document.getElementById('transformBtn').addEventListener('click', () => {
+            if (!poFileData || !currentMapping) return;
+            
+            const btn = document.getElementById('transformBtn');
+            btn.classList.add('processing');
+            btn.textContent = 'Processing...';
+            btn.disabled = true;
+            
+            document.getElementById('results').classList.remove('visible');
+            document.getElementById('errorMessage').classList.remove('visible');
+            
+            setTimeout(() => {
+                try {
+                    const result = transformPO(poFileData, contactsData);
+                    transformedData = result;
+                    displayResults(result);
+                } catch (error) {
+                    showError(error.message);
+                } finally {
+                    btn.classList.remove('processing');
+                    btn.textContent = 'Transform to Cin7 Format';
+                    btn.disabled = false;
+                }
+            }, 500);
+        });
+        
+        function transformPO(data, contacts) {
+            if (!currentMapping) {
+                throw new Error('No column mapping defined');
+            }
+            
+            // Get delivery template and internal comments template if they exist for current format
+            let deliveryTemplate = '';
+            let internalCommentsTemplate = '';
+            if (currentMapping) {
+                const currentFingerprint = createFingerprint(currentColumns);
+                const fpMatches = formatLibrary.filter(f => f.fingerprint === currentFingerprint);
+                let matchedFormat = null;
+                if (fpMatches.length === 1) {
+                    matchedFormat = fpMatches[0];
+                } else if (fpMatches.length > 1) {
+                    const firstDataRow = data[0] || {};
+                    matchedFormat = fpMatches.find(f => {
+                        if (!f.contentIdentifier || !f.contentIdentifier.column) return false;
+                        const cellValue = (firstDataRow[f.contentIdentifier.column] || '').trim().toLowerCase();
+                        const expected = (f.contentIdentifier.value || '').trim().toLowerCase();
+                        return expected && cellValue === expected;
+                    }) || fpMatches[0];
+                }
+                if (matchedFormat && matchedFormat.deliveryTemplate) {
+                    deliveryTemplate = matchedFormat.deliveryTemplate;
+                }
+                if (matchedFormat && matchedFormat.internalCommentsTemplate) {
+                    internalCommentsTemplate = matchedFormat.internalCommentsTemplate;
+                }
+            }
+            
+            const stateMap = {
+                'AL': 'AL', 'ALABAMA': 'AL', 'AK': 'AK', 'ALASKA': 'AK', 'AZ': 'AZ', 'ARIZONA': 'AZ',
+                'AR': 'AR', 'ARKANSAS': 'AR', 'CA': 'CA', 'CALIFORNIA': 'CA', 'CO': 'CO', 'COLORADO': 'CO',
+                'CT': 'CT', 'CONNECTICUT': 'CT', 'DE': 'DE', 'DELAWARE': 'DE', 'FL': 'FL', 'FLORIDA': 'FL',
+                'GA': 'GA', 'GEORGIA': 'GA', 'HI': 'HI', 'HAWAII': 'HI', 'ID': 'ID', 'IDAHO': 'ID',
+                'IL': 'IL', 'ILLINOIS': 'IL', 'IN': 'IN', 'INDIANA': 'IN', 'IA': 'IA', 'IOWA': 'IA',
+                'KS': 'KS', 'KANSAS': 'KS', 'KY': 'KY', 'KENTUCKY': 'KY', 'LA': 'LA', 'LOUISIANA': 'LA',
+                'ME': 'ME', 'MAINE': 'ME', 'MD': 'MD', 'MARYLAND': 'MD', 'MA': 'MA', 'MASSACHUSETTS': 'MA',
+                'MI': 'MI', 'MICHIGAN': 'MI', 'MN': 'MN', 'MINNESOTA': 'MN', 'MS': 'MS', 'MISSISSIPPI': 'MS',
+                'MO': 'MO', 'MISSOURI': 'MO', 'MT': 'MT', 'MONTANA': 'MT', 'NE': 'NE', 'NEBRASKA': 'NE',
+                'NV': 'NV', 'NEVADA': 'NV', 'NH': 'NH', 'NEW HAMPSHIRE': 'NH', 'NJ': 'NJ', 'NEW JERSEY': 'NJ',
+                'NM': 'NM', 'NEW MEXICO': 'NM', 'NY': 'NY', 'NEW YORK': 'NY', 'NC': 'NC', 'NORTH CAROLINA': 'NC',
+                'ND': 'ND', 'NORTH DAKOTA': 'ND', 'OH': 'OH', 'OHIO': 'OH', 'OK': 'OK', 'OKLAHOMA': 'OK',
+                'OR': 'OR', 'OREGON': 'OR', 'PA': 'PA', 'PENNSYLVANIA': 'PA', 'RI': 'RI', 'RHODE ISLAND': 'RI',
+                'SC': 'SC', 'SOUTH CAROLINA': 'SC', 'SD': 'SD', 'SOUTH DAKOTA': 'SD', 'TN': 'TN', 'TENNESSEE': 'TN',
+                'TX': 'TX', 'TEXAS': 'TX', 'UT': 'UT', 'UTAH': 'UT', 'VT': 'VT', 'VERMONT': 'VT',
+                'VA': 'VA', 'VIRGINIA': 'VA', 'WA': 'WA', 'WASHINGTON': 'WA', 'WV': 'WV', 'WEST VIRGINIA': 'WV',
+                'WI': 'WI', 'WISCONSIN': 'WI', 'WY': 'WY', 'WYOMING': 'WY'
+            };
+            
+            function normalizeState(state) {
+                if (!state) return '';
+                const upper = state.trim().toUpperCase();
+                return stateMap[upper] || upper;
+            }
+            
+            function calculateSimilarity(str1, str2) {
+                const longer = str1.length > str2.length ? str1 : str2;
+                const shorter = str1.length > str2.length ? str2 : str1;
+                if (longer.length === 0) return 1.0;
+                
+                const editDistance = (s1, s2) => {
+                    s1 = s1.toLowerCase();
+                    s2 = s2.toLowerCase();
+                    const costs = [];
+                    for (let i = 0; i <= s1.length; i++) {
+                        let lastValue = i;
+                        for (let j = 0; j <= s2.length; j++) {
+                            if (i === 0) {
+                                costs[j] = j;
+                            } else if (j > 0) {
+                                let newValue = costs[j - 1];
+                                if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
+                                    newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+                                }
+                                costs[j - 1] = lastValue;
+                                lastValue = newValue;
+                            }
+                        }
+                        if (i > 0) costs[s2.length] = lastValue;
+                    }
+                    return costs[s2.length];
+                };
+                
+                return (longer.length - editDistance(longer, shorter)) / longer.length;
+            }
+            
+            // Group by PO - mapping is now {cin7Field: csvCol}
+            const poColumn = currentMapping['Order Ref'] || Object.keys(data[0])[0];
+            
+            // Forward-fill PO number for multi-record-type formats (e.g. Princess Auto)
+            // where the PO number only appears on the header (H) row and detail (D) rows are blank.
+            let lastPoNumber = '';
+            for (const row of data) {
+                const val = (row[poColumn] || '').toString().trim();
+                if (val) {
+                    lastPoNumber = val;
+                } else if (lastPoNumber) {
+                    row[poColumn] = lastPoNumber;
+                }
+            }
+            
+            const poGroups = {};
+            
+            for (const row of data) {
+                const poNumber = (row[poColumn] || '').toString().trim();
+                if (!poNumber) continue;
+                if (!poGroups[poNumber]) poGroups[poNumber] = [];
+                poGroups[poNumber].push(row);
+            }
+            
+            const allCin7Rows = [];
+            let totalLineItems = 0;
+            let totalMatched = 0;
+            const poSummaries = [];
+            
+            for (const [poNumber, lineItems] of Object.entries(poGroups)) {
+                const headerRow = lineItems[0];
+                
+                // Get company info - mapping is now {cin7Field: csvCol}
+                const companyCol = currentMapping['Company'];
+                const cityCol = currentMapping['Delivery City'];
+                const stateCol = currentMapping['Delivery State'];
+                
+                const getColValue = (col, row) => col
+                    ? (col.startsWith('__STATIC__:') ? col.slice('__STATIC__:'.length) : (row[col] || ''))
+                    : '';
+                const poCompanyName = getColValue(companyCol, headerRow).trim();
+                const shipToCity = getColValue(cityCol, headerRow).trim().toUpperCase();
+                const normalizedShipState = normalizeState(getColValue(stateCol, headerRow));
+                
+                let matchedCompany = null;
+                let matchMethod = 'Original name';
+                let hasWarning = false;
+                
+                if (contacts && poCompanyName) {
+                    const nameMatches = [];
+                    
+                    // Apply alias substitution (case-insensitive)
+                    let searchName = poCompanyName;
+                    const aliasMatch = aliasLibrary.find(a => 
+                        a.from.trim().toUpperCase() === poCompanyName.toUpperCase()
+                    );
+                    if (aliasMatch) {
+                        searchName = aliasMatch.to;
+                    }
+
+                    for (const contact of contacts) {
+                        const contactCompany = (contact['Company'] || '').trim();
+                        if (!contactCompany) continue;
+                        const similarity = calculateSimilarity(searchName.toLowerCase(), contactCompany.toLowerCase());
+                        if (similarity >= 0.65) {
+                            nameMatches.push({ contact: contact, similarity: similarity });
+                        }
+                    }
+                    
+                    if (nameMatches.length === 0) {
+                        // Keyword + address fallback: try matching on first word of company name + city/state
+                        const keyword = searchName.split(/\s+/)[0].toLowerCase();
+                        const keywordHits = contacts.filter(c => {
+                            const cc = (c['Company'] || '').toLowerCase();
+                            return cc.includes(keyword);
+                        });
+                        const addressHit = keywordHits.find(c => {
+                            const contactCity = (c['Delivery City'] || '').toUpperCase();
+                            const contactState = normalizeState(c['Delivery State'] || '');
+                            return contactCity === shipToCity && contactState === normalizedShipState;
+                        });
+                        if (addressHit) {
+                            matchedCompany = addressHit['Company'];
+                            matchMethod = `Keyword + address match ("${keyword}", ${shipToCity} ${normalizedShipState})`;
+                            totalMatched++;
+                        } else {
+                            matchedCompany = poCompanyName;
+                            matchMethod = 'No match found - using PO name';
+                            hasWarning = true;
+                        }
+                    } else if (nameMatches.length === 1) {
+                        matchedCompany = nameMatches[0].contact['Company'];
+                        matchMethod = aliasMatch
+                            ? `Alias match: ${poCompanyName} → ${searchName} (${Math.round(nameMatches[0].similarity * 100)}%)`
+                            : `Auto-matched by name (${Math.round(nameMatches[0].similarity * 100)}%)`;
+                        totalMatched++;
+                    } else {
+                        let bestMatch = null;
+                        if (shipToCity && normalizedShipState) {
+                            for (const match of nameMatches) {
+                                const contactCity = (match.contact['Delivery City'] || '').toUpperCase();
+                                const contactState = normalizeState(match.contact['Delivery State'] || '');
+                                if (contactCity === shipToCity && contactState === normalizedShipState) {
+                                    bestMatch = match;
+                                    break;
+                                }
+                            }
+                        }
+                        if (bestMatch) {
+                            matchedCompany = bestMatch.contact['Company'];
+                            matchMethod = aliasMatch
+                                ? `Alias + address match: ${poCompanyName} → ${searchName}, confirmed by city/state`
+                                : `Auto-matched by name + address (${Math.round(bestMatch.similarity * 100)}%)`;
+                            totalMatched++;
+                        } else {
+                            const topMatch = nameMatches.reduce((best, current) => 
+                                current.similarity > best.similarity ? current : best
+                            );
+                            matchedCompany = topMatch.contact['Company'];
+                            matchMethod = aliasMatch
+                                ? `Alias match: ${poCompanyName} → ${searchName} (verify address - no city/state tiebreaker)`
+                                : `Auto-matched by name only (${Math.round(topMatch.similarity * 100)}% - verify address)`;
+                            totalMatched++;
+                        }
+                    }
+                } else if (contacts) {
+                    matchedCompany = poCompanyName;
+                    matchMethod = 'No company name in PO';
+                    hasWarning = true;
+                } else {
+                    matchedCompany = poCompanyName;
+                }
+                
+                const companyName = matchedCompany || poCompanyName || 'Unknown';
+                
+                // Build Cin7 rows
+                const cin7Rows = lineItems.map(item => {
+                    const cin7Row = {};
+                    
+                    // Apply mapping - {cin7Field: csvCol or __STATIC__:value}
+                    for (const [cin7Field, csvCol] of Object.entries(currentMapping)) {
+                        if (csvCol.startsWith('__STATIC__:')) {
+                            cin7Row[cin7Field] = csvCol.slice('__STATIC__:'.length);
+                        } else {
+                            cin7Row[cin7Field] = item[csvCol] || '';
+                        }
+                    }
+                    
+                    cin7Row['Stage'] = 'Release to Pick';
+                    cin7Row['Company'] = companyName;
+                    // Use mapped column for Delivery Company if set, otherwise fall back to company match
+                    const deliveryCompanyCol = currentMapping['Delivery Company'];
+                    if (deliveryCompanyCol) {
+                        cin7Row['Delivery Company'] = deliveryCompanyCol.startsWith('__STATIC__:')
+                            ? deliveryCompanyCol.slice('__STATIC__:'.length)
+                            : (item[deliveryCompanyCol] || headerRow[deliveryCompanyCol] || companyName);
+                    } else {
+                        cin7Row['Delivery Company'] = companyName;
+                    }
+                    
+                    // Process delivery instructions
+                    if (deliveryTemplate) {
+                        let instructions = deliveryTemplate;
+                        const now = new Date();
+                        const timestamp = now.toISOString().slice(0, 16).replace('T', ' ');
+                        instructions = instructions.replace(/Updated via ShipStation at \d{4}-\d{2}-\d{2} \d{2}:\d{2}/, `Updated via ShipStation at ${timestamp}`);
+                        
+                        const placeholderRegex = /<([^>]+)>/g;
+                        instructions = instructions.replace(placeholderRegex, (match, fieldName) => {
+                            return cin7Row[fieldName] || item[fieldName] || headerRow[fieldName] || match;
+                        });
+                        
+                        cin7Row['Delivery Instructions'] = instructions;
+                    }
+
+                    // Process internal comments
+                    if (internalCommentsTemplate) {
+                        let comments = internalCommentsTemplate;
+                        const placeholderRegex = /<([^>]+)>/g;
+                        comments = comments.replace(placeholderRegex, (match, fieldName) => {
+                            return cin7Row[fieldName] || item[fieldName] || headerRow[fieldName] || match;
+                        });
+                        cin7Row['Internal Comments'] = comments;
+                    }
+                    
+                    // Ensure all columns exist
+                    for (const col of Object.keys(cin7Columns)) {
+                        if (!(col in cin7Row)) cin7Row[col] = '';
+                    }
+                    
+                    return cin7Row;
+                });
+
+                // Merge split rows: build a reference row from all non-empty values across the PO,
+                // then backfill only rows that originally had an item code. This prevents header-only
+                // rows from being promoted into duplicates after backfilling.
+                const referenceRow = {};
+                for (const row of cin7Rows) {
+                    for (const [key, val] of Object.entries(row)) {
+                        if (val && !referenceRow[key]) referenceRow[key] = val;
+                    }
+                }
+                const mergedRows = cin7Rows
+                    .filter(row => row['Item Code'] && row['Item Qty'] && row['Item Price'])
+                    .map(row => {
+                        const merged = Object.assign({}, referenceRow, ...Object.entries(row)
+                            .filter(([, v]) => v !== '')
+                            .map(([k, v]) => ({ [k]: v })));
+                        return merged;
+                    });
+                
+                allCin7Rows.push(...mergedRows);
+                totalLineItems += mergedRows.length;
+                
+                poSummaries.push({
+                    poNumber: poNumber,
+                    lineCount: lineItems.length,
+                    companyName: companyName,
+                    matchMethod: matchMethod,
+                    hasWarning: hasWarning
+                });
+            }
+            
+            if (allCin7Rows.length === 0) {
+                throw new Error('No valid POs found to transform');
+            }
+            
+            const csvContent = Papa.unparse(allCin7Rows);
+            
+            return {
+                csvContent: csvContent,
+                poCount: Object.keys(poGroups).length,
+                totalLineItems: totalLineItems,
+                totalMatched: totalMatched,
+                poSummaries: poSummaries,
+                firstPO: poSummaries[0]?.poNumber || 'Multiple'
+            };
+        }
+        
+        function displayResults(result) {
+            const title = result.poCount === 1 ? result.firstPO : `${result.poCount} Purchase Orders`;
+            document.getElementById('resultTitle').textContent = title;
+            document.getElementById('poNumber').textContent = result.poCount === 1 ? result.firstPO : `${result.poCount} POs`;
+            document.getElementById('lineCount').textContent = result.totalLineItems;
+            
+            const hasWarnings = result.poSummaries.some(po => po.hasWarning);
+            let matchText = '';
+            
+            if (contactsData) {
+                if (result.totalMatched > 0) {
+                    matchText = `${result.totalMatched} of ${result.poCount} companies auto-matched`;
+                    if (hasWarnings) matchText += ' ⚠️ Some companies not found in contacts';
+                } else {
+                    matchText = '⚠️ No matches found - verify company names in contact export';
+                }
+            } else {
+                matchText = 'No contact file provided - using original company names';
+            }
+            
+            document.getElementById('companyName').textContent = result.poCount === 1 ? result.poSummaries[0]?.companyName : `${result.poCount} companies`;
+            document.getElementById('matchText').textContent = matchText;
+            document.getElementById('results').classList.add('visible');
+        }
+        
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = '⚠ Error: ' + message;
+            errorEl.classList.add('visible');
+        }
+        
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            if (!transformedData) return;
+            
+            const filename = transformedData.poCount === 1
+                ? `${transformedData.firstPO}_cin7_import.csv`
+                : `cin7_bulk_import_${transformedData.poCount}_orders.csv`;
+            
+            const blob = new Blob([transformedData.csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+        
+        // Format Manager Functions
+        function openFormatManager() {
+            document.getElementById('formatManagerModal').classList.add('visible');
+            showFormatList();
+            renderFormatList();
+        }
+        
+        function closeFormatManager() {
+            document.getElementById('formatManagerModal').classList.remove('visible');
+        }
+        
+        function showFormatList() {
+            document.getElementById('formatListView').style.display = 'block';
+            document.getElementById('formatEditorView').style.display = 'none';
+            currentEditingFormatId = null;
+        }
+        
+        function showFormatEditor(formatId) {
+            currentEditingFormatId = formatId;
+            const format = formatLibrary.find(f => f.id === formatId);
+            
+            if (format) {
+                document.getElementById('editFormatName').value = format.name || '';
+                document.getElementById('editDeliveryTemplate').value = format.deliveryTemplate || '';
+                document.getElementById('editInternalCommentsTemplate').value = format.internalCommentsTemplate || '';
+                document.getElementById('editIdentifierColumn').value = (format.contentIdentifier && format.contentIdentifier.column) || '';
+                document.getElementById('editIdentifierValue').value = (format.contentIdentifier && format.contentIdentifier.value) || '';
+                
+                // Populate mappings - Cin7 fields are fixed, CSV columns are the dropdowns
+                const editMappingRowsEl = document.getElementById('editMappingRows');
+                editMappingRowsEl.innerHTML = '';
+                
+                Object.keys(cin7Columns).forEach(cin7Field => {
+                    const savedValue = format.mapping[cin7Field] || '';
+                    editMappingRowsEl.appendChild(buildMappingRow(cin7Field, format.columns || [], savedValue));
+                });
+                
+                document.getElementById('formatListView').style.display = 'none';
+                document.getElementById('formatEditorView').style.display = 'block';
+            }
+        }
+        
+        function renderFormatList() {
+            const listEl = document.getElementById('formatList');
+            
+            if (formatLibrary.length === 0) {
+                listEl.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <div>No saved formats yet</div>
+                        <div style="font-size: 0.9rem; margin-top: 8px;">Upload a PO file and map columns to create your first format</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            listEl.innerHTML = formatLibrary.map(format => {
+                const mappingCount = Object.keys(format.mapping).length;
+                const hasDelivery = format.deliveryTemplate && format.deliveryTemplate.trim().length > 0;
+                const hasIdentifier = format.contentIdentifier && format.contentIdentifier.column && format.contentIdentifier.value;
+                const createdDate = new Date(format.created).toLocaleDateString();
+                
+                return `
+                    <div class="format-item">
+                        <div class="format-item-header">
+                            <div class="format-item-info">
+                                <div class="format-item-name">${format.name}</div>
+                                <div class="format-item-details">
+                                    ${mappingCount} column mapping${mappingCount !== 1 ? 's' : ''}
+                                    ${hasDelivery ? ' • Custom delivery instructions' : ''}
+                                    ${hasIdentifier ? ` • ID: ${format.contentIdentifier.column} = "${format.contentIdentifier.value}"` : ''}
+                                </div>
+                                <div class="format-item-details">Created: ${createdDate}</div>
+                            </div>
+                            <div class="format-item-actions">
+                                <button class="btn btn-secondary btn-small" onclick="showFormatEditor('${format.id}')">Edit</button>
+                            </div>
+                        </div>
+                        <div class="format-item-mapping">
+                            ${Object.entries(format.mapping).slice(0, 5).map(([cin7Field, csvCol]) => `
+                                <div class="mapping-preview">
+                                    <div>${cin7Field}</div>
+                                    <div class="mapping-preview-arrow">→</div>
+                                    <div>${csvCol}</div>
+                                </div>
+                            `).join('')}
+                            ${Object.keys(format.mapping).length > 5 ? '<div style="color: var(--text-dim); margin-top: 8px;">+ ' + (Object.keys(format.mapping).length - 5) + ' more mappings</div>' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function updateFormat() {
+            if (!currentEditingFormatId) return;
+            
+            const name = document.getElementById('editFormatName').value.trim();
+            const deliveryTemplate = document.getElementById('editDeliveryTemplate').value.trim();
+            const internalCommentsTemplate = document.getElementById('editInternalCommentsTemplate').value.trim();
+            const identifierColumn = document.getElementById('editIdentifierColumn').value.trim();
+            const identifierValue = document.getElementById('editIdentifierValue').value.trim();
+            
+            if (!name) {
+                alert('Please enter a format name');
+                return;
+            }
+            
+            // Collect updated mappings - {cin7Field: csvCol or __STATIC__:value}
+            const mapping = {};
+            document.querySelectorAll('#editMappingRows .mapping-row').forEach(row => {
+                const cin7Field = row.querySelector('select').dataset.cin7;
+                const val = readMappingValue(row);
+                if (val) mapping[cin7Field] = val;
+            });
+            
+            if (Object.keys(mapping).length === 0) {
+                alert('Please keep at least one column mapping');
+                return;
+            }
+            
+            const formatIndex = formatLibrary.findIndex(f => f.id === currentEditingFormatId);
+            if (formatIndex !== -1) {
+                formatLibrary[formatIndex].name = name;
+                formatLibrary[formatIndex].mapping = mapping;
+                formatLibrary[formatIndex].deliveryTemplate = deliveryTemplate;
+                formatLibrary[formatIndex].internalCommentsTemplate = internalCommentsTemplate;
+                formatLibrary[formatIndex].contentIdentifier = { column: identifierColumn, value: identifierValue };
+                localStorage.setItem('formatLibrary', JSON.stringify(formatLibrary));
+                renderFormatList();
+                showFormatList();
+            }
+        }
+        
+        function deleteCurrentFormat() {
+            if (!currentEditingFormatId) return;
+            if (!confirm('Are you sure you want to delete this format?')) return;
+            
+            formatLibrary = formatLibrary.filter(f => f.id !== currentEditingFormatId);
+            localStorage.setItem('formatLibrary', JSON.stringify(formatLibrary));
+            renderFormatList();
+            showFormatList();
+        }
+
+        // ── Tab switching ──────────────────────────────────────────────
+        function switchManagerTab(tab) {
+            const isFormats = tab === 'formats';
+            document.getElementById('formatsTabContent').style.display = isFormats ? '' : 'none';
+            document.getElementById('aliasesTabContent').style.display = isFormats ? 'none' : '';
+            document.getElementById('tabFormats').style.borderBottomColor = isFormats ? 'var(--accent)' : 'transparent';
+            document.getElementById('tabFormats').style.color = isFormats ? 'var(--accent)' : 'var(--text-dim)';
+            document.getElementById('tabAliases').style.borderBottomColor = isFormats ? 'transparent' : 'var(--accent)';
+            document.getElementById('tabAliases').style.color = isFormats ? 'var(--text-dim)' : 'var(--accent)';
+            if (!isFormats) renderAliasList();
+        }
+
+        // ── Alias functions ────────────────────────────────────────────
+        function renderAliasList() {
+            const el = document.getElementById('aliasList');
+            if (aliasLibrary.length === 0) {
+                el.innerHTML = '<div style="color: var(--text-dim); font-size: 0.85rem; padding: 12px 0;">No aliases defined yet.</div>';
+                return;
+            }
+            el.innerHTML = aliasLibrary.map((alias, index) => `
+                <div style="display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 10px; align-items: center; padding: 10px 14px; background: var(--bg-lighter); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px;">
+                    <div style="font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--text);">${alias.from}</div>
+                    <div style="color: var(--accent); font-size: 1rem;">→</div>
+                    <div style="font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--text);">${alias.to}</div>
+                    <button onclick="removeAlias(${index})" style="background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--text-dim); cursor: pointer; padding: 4px 10px; font-size: 0.8rem;">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function addAlias() {
+            const from = document.getElementById('newAliasFrom').value.trim();
+            const to = document.getElementById('newAliasTo').value.trim();
+            if (!from || !to) { alert('Please fill in both fields.'); return; }
+            if (aliasLibrary.some(a => a.from.toUpperCase() === from.toUpperCase())) {
+                alert('An alias for "' + from + '" already exists. Remove it first to replace it.');
+                return;
+            }
+            aliasLibrary.push({ from, to });
+            localStorage.setItem('aliasLibrary', JSON.stringify(aliasLibrary));
+            document.getElementById('newAliasFrom').value = '';
+            document.getElementById('newAliasTo').value = '';
+            renderAliasList();
+        }
+
+        function removeAlias(index) {
+            aliasLibrary.splice(index, 1);
+            localStorage.setItem('aliasLibrary', JSON.stringify(aliasLibrary));
+            renderAliasList();
+        }
+    </script>
+</body>
+</html>

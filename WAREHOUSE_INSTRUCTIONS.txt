@@ -1,0 +1,52 @@
+╔═══════════════════════════════════════════════════════════╗
+║                                                           ║
+║     PO TRANSFORMER - WAREHOUSE MANAGER INSTRUCTIONS      ║
+║                                                           ║
+╚═══════════════════════════════════════════════════════════╝
+
+THIS IS THE EASIEST VERSION - JUST ONE FILE!
+
+📋 HOW TO USE (3 SIMPLE STEPS):
+
+1. DOUBLE-CLICK the file: po_transformer.html
+   → It opens in your web browser (Chrome, Edge, Safari, etc.)
+
+2. DRAG YOUR FILES into the boxes:
+   • First box: Drop your PO CSV file
+   • Second box: Drop the Contact Export CSV (optional)
+   
+3. CLICK "TRANSFORM TO CIN7 FORMAT"
+   → Wait a few seconds
+   → Click "DOWNLOAD CIN7 IMPORT FILE"
+   → Done!
+
+════════════════════════════════════════════════════════════
+
+✅ WHAT YOU GET:
+   • Transformed CSV ready for Cin7
+   • Company names auto-matched (if you included Contact Export)
+   • All line items converted
+   • Stage set to "Release to Pick"
+
+✏️ WHAT TO DO AFTER:
+   1. Open the downloaded CSV
+   2. Check/adjust Company and Company ID columns
+   3. Add email addresses if needed
+   4. Import to Cin7!
+
+════════════════════════════════════════════════════════════
+
+💡 TIPS:
+   • Works on ANY computer (Mac, PC, doesn't matter!)
+   • No installation needed
+   • No internet required (except first time to load fonts)
+   • Can email this file to anyone - they just double-click it!
+   • Keep the Contact Export file updated for best results
+
+❓ NEED HELP?
+   Contact James - this should be super simple!
+
+════════════════════════════════════════════════════════════
+
+THAT'S IT! Just double-click and go. 
+No Python, no Terminal, no complicated setup.
