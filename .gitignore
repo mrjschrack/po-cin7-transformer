@@ -1,5 +1,8 @@
 .DS_Store
 *.mov
+
+# Convention: when a new version is released, add the previous version here
+# so only the latest version is tracked in the repo.
 po_transformer.html
 po_transformer-2.html
 po_transformer_v3.html
