@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PO → Cin7 Transformer v5.5</title>
+    <title>PO → Cin7 Transformer v5.6</title>
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Work+Sans:wght@300;400;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
@@ -801,7 +801,7 @@
         <header>
             <h1>PO → Cin7 Transformer</h1>
             <p class="subtitle">Convert retail purchase orders to Cin7-ready imports with smart company matching</p>
-            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 6px; font-family: 'Space Mono', monospace;">v5.5</div>
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 6px; font-family: 'Space Mono', monospace;">v5.6</div>
             <div class="header-actions">
                 <button class="btn btn-secondary btn-small" onclick="openFormatManager()">Manage Formats</button>
             </div>
@@ -1474,6 +1474,57 @@
             }, 500);
         });
         
+        // Utility: resolve a ship date based on global rules
+        // - If a date is provided and is today or in the future → use it as-is
+        // - If a date is provided but is in the past → use next business day from today
+        // - If no date is provided → use 7 business days from today
+        function resolveShipDate(rawDate) {
+            function addBusinessDays(startDate, days) {
+                const result = new Date(startDate);
+                let added = 0;
+                while (added < days) {
+                    result.setDate(result.getDate() + 1);
+                    const dow = result.getDay();
+                    if (dow !== 0 && dow !== 6) added++;
+                }
+                return result;
+            }
+
+            function nextBusinessDay(date) {
+                const result = new Date(date);
+                const dow = result.getDay();
+                if (dow === 6) result.setDate(result.getDate() + 2);
+                else if (dow === 0) result.setDate(result.getDate() + 1);
+                return result;
+            }
+
+            function formatDate(date) {
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+                const dd = String(date.getDate()).padStart(2, '0');
+                const yyyy = date.getFullYear();
+                return `${mm}/${dd}/${yyyy}`;
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (rawDate && rawDate.trim() !== '') {
+                const parsed = new Date(rawDate);
+                if (!isNaN(parsed)) {
+                    parsed.setHours(0, 0, 0, 0);
+                    if (parsed >= today) {
+                        return rawDate; // valid future date, use as-is
+                    } else {
+                        // Past date — roll forward to next business day from today
+                        return formatDate(nextBusinessDay(today));
+                    }
+                }
+            }
+
+            // No date provided — default to 7 business days from today
+            return formatDate(addBusinessDays(today, 7));
+        }
+
         function transformPO(data, contacts) {
             if (!currentMapping) {
                 throw new Error('No column mapping defined');
@@ -1616,7 +1667,7 @@
                     // Apply alias substitution (case-insensitive)
                     let searchName = poCompanyName;
                     const aliasMatch = aliasLibrary.find(a => 
-                        a.from.trim().toUpperCase() === poCompanyName.toUpperCase()
+                        poCompanyName.toUpperCase().startsWith(a.from.trim().toUpperCase())
                     );
                     if (aliasMatch) {
                         searchName = aliasMatch.to;
@@ -1710,6 +1761,9 @@
                         }
                     }
                     
+                    // Resolve ship date using global rules (never in the past; default 7 biz days from today)
+                    cin7Row['Requested Ship Date'] = resolveShipDate(cin7Row['Requested Ship Date']);
+
                     cin7Row['Stage'] = 'Release to Pick';
                     cin7Row['Company'] = companyName;
                     // Use mapped column for Delivery Company if set, otherwise fall back to company match

@@ -1,5 +1,10 @@
 # Changelog
 
+## [v5.6] - 2026-02-23
+
+### Changes
+- Global ship date resolution logic: never-in-the-past rule with 7-business-day fallback from order entry date
+
 ## [v5.4] - 2025-02-19
 
 ### Current Features
