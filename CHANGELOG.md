@@ -1,5 +1,12 @@
 # Changelog
 
+## [v5.7] - 2026-02-24
+
+### Changes
+- Academy ship date range parsing
+- Format export/import in JSON
+- Improved content identifier disambiguation
+
 ## [v5.6] - 2026-02-23
 
 ### Changes

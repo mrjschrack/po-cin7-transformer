@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PO → Cin7 Transformer v5.6</title>
+    <title>PO → Cin7 Transformer v5.7</title>
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Work+Sans:wght@300;400;600&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
@@ -801,7 +801,7 @@
         <header>
             <h1>PO → Cin7 Transformer</h1>
             <p class="subtitle">Convert retail purchase orders to Cin7-ready imports with smart company matching</p>
-            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 6px; font-family: 'Space Mono', monospace;">v5.6</div>
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 6px; font-family: 'Space Mono', monospace;">v5.7</div>
             <div class="header-actions">
                 <button class="btn btn-secondary btn-small" onclick="openFormatManager()">Manage Formats</button>
             </div>
@@ -909,6 +909,10 @@
             <!-- Formats Tab -->
             <div id="formatsTabContent">
             <div id="formatListView">
+                <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+                    <button class="btn btn-secondary btn-small" onclick="exportFormats()">⬇ Export Formats</button>
+                    <label class="btn btn-secondary btn-small" style="cursor: pointer; margin: 0;">⬆ Import Formats<input type="file" accept=".json" onchange="importFormats(event)" style="display: none;"></label>
+                </div>
                 <div class="format-list" id="formatList">
                     <!-- Format items will be populated here -->
                 </div>
@@ -1142,15 +1146,18 @@
                 matchedFormat = fingerprintMatches[0];
             } else if (fingerprintMatches.length > 1) {
                 // Multiple formats share this structure — use content identifier as tiebreaker
-                const firstDataRow = poFileData[0] || {};
+                const sampleRows = poFileData.slice(0, 5);
                 matchedFormat = fingerprintMatches.find(f => {
                     if (!f.contentIdentifier || !f.contentIdentifier.column) return false;
-                    const cellValue = (firstDataRow[f.contentIdentifier.column] || '').trim().toLowerCase();
                     const expected = (f.contentIdentifier.value || '').trim().toLowerCase();
-                    return expected && cellValue === expected;
+                    if (!expected) return false;
+                    return sampleRows.some(row => {
+                        const cellValue = (row[f.contentIdentifier.column] || '').trim().toLowerCase();
+                        if (!cellValue) return false;
+                        return cellValue.includes(expected) || expected.includes(cellValue);
+                    });
                 });
-                // Fall back to first match if tiebreaker finds nothing
-                if (!matchedFormat) matchedFormat = fingerprintMatches[0];
+                // No fallback — if content identifier doesn't match, show as unrecognized
             }
             
             document.getElementById('results').classList.remove('visible');
@@ -1508,6 +1515,11 @@
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
+            // Strip date ranges like "03/02/2026 - 03/04/2026" → use first date only
+            if (rawDate && /\d{1,2}\/\d{1,2}\/\d{4}\s*-\s*\d{1,2}\/\d{1,2}\/\d{4}/.test(rawDate)) {
+                rawDate = rawDate.split('-')[0].trim();
+            }
+
             if (rawDate && rawDate.trim() !== '') {
                 const parsed = new Date(rawDate);
                 if (!isNaN(parsed)) {
@@ -1540,13 +1552,17 @@
                 if (fpMatches.length === 1) {
                     matchedFormat = fpMatches[0];
                 } else if (fpMatches.length > 1) {
-                    const firstDataRow = data[0] || {};
+                    const sampleRows = data.slice(0, 5);
                     matchedFormat = fpMatches.find(f => {
                         if (!f.contentIdentifier || !f.contentIdentifier.column) return false;
-                        const cellValue = (firstDataRow[f.contentIdentifier.column] || '').trim().toLowerCase();
                         const expected = (f.contentIdentifier.value || '').trim().toLowerCase();
-                        return expected && cellValue === expected;
-                    }) || fpMatches[0];
+                        if (!expected) return false;
+                        return sampleRows.some(row => {
+                            const cellValue = (row[f.contentIdentifier.column] || '').trim().toLowerCase();
+                            if (!cellValue) return false;
+                            return cellValue.includes(expected) || expected.includes(cellValue);
+                        });
+                    }) || null;
                 }
                 if (matchedFormat && matchedFormat.deliveryTemplate) {
                     deliveryTemplate = matchedFormat.deliveryTemplate;
@@ -2046,6 +2062,55 @@
             localStorage.setItem('formatLibrary', JSON.stringify(formatLibrary));
             renderFormatList();
             showFormatList();
+        }
+
+        // ── Format Export / Import ─────────────────────────────────────
+        function exportFormats() {
+            if (formatLibrary.length === 0) {
+                alert('No formats to export.');
+                return;
+            }
+            const blob = new Blob([JSON.stringify(formatLibrary, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'po_transformer_formats.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importFormats(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (!Array.isArray(imported)) throw new Error('Invalid format file.');
+                    let added = 0, skipped = 0;
+                    imported.forEach(fmt => {
+                        const duplicate = formatLibrary.some(f => f.name === fmt.name);
+                        if (duplicate) {
+                            skipped++;
+                        } else {
+                            // Ensure required fields exist
+                            fmt.id = fmt.id || Date.now().toString() + Math.random().toString(36).slice(2);
+                            fmt.created = fmt.created || new Date().toISOString();
+                            fmt.contentIdentifier = fmt.contentIdentifier || { column: '', value: '' };
+                            formatLibrary.push(fmt);
+                            added++;
+                        }
+                    });
+                    localStorage.setItem('formatLibrary', JSON.stringify(formatLibrary));
+                    renderFormatList();
+                    alert(`Import complete: ${added} format(s) added, ${skipped} skipped (duplicate name).`);
+                } catch (err) {
+                    alert('Failed to import: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            // Reset input so same file can be re-imported if needed
+            event.target.value = '';
         }
 
         // ── Tab switching ──────────────────────────────────────────────
