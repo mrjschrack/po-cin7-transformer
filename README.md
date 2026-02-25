@@ -19,6 +19,8 @@ A standalone browser-based tool that converts retail purchase orders from variou
 - Academy Sports
 - Tractor Supply
 - Zoro
+- Fastenal
+- Bass Pro
 - Princess Auto *(see format notes below)*
 
 ## Usage

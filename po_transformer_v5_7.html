@@ -1129,7 +1129,7 @@
         
         // Format recognition functions
         function createFingerprint(columns) {
-            const sortedColumns = [...columns].sort().join('|');
+            const sortedColumns = [...columns].filter(c => c.trim() !== '').sort().join('|');
             return sortedColumns.toLowerCase();
         }
         

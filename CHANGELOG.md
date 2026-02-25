@@ -1,11 +1,14 @@
 # Changelog
 
-## [v5.7] - 2026-02-24
+## [v5.7] - 2026-02-25
 
 ### Changes
 - Academy ship date range parsing
 - Format export/import in JSON
 - Improved content identifier disambiguation
+- Fixed `createFingerprint()` to filter out empty column names before generating fingerprints — trailing commas in SPS CSV exports were producing a leading `|` artifact that caused format mismatches
+- Updated all 7 stored format fingerprints to match the corrected logic (Zoro, Tractor Supply, Princess Auto, Fastenal, Academy Sports, Bass Pro, Scheels)
+- Tractor Supply fingerprint updated to reflect new columns added by TSC to their SPS export: additional address 1/2/city/state/country/name and catalog price
 
 ## [v5.6] - 2026-02-23
 
